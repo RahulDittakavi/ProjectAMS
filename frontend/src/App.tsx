@@ -2,10 +2,8 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import MainLayout from './components/MainLayout';
 import ProtectedRoute from './components/ProtectedRoute';
-import Login from './pages/Auth/Login';
-import Register from './pages/Auth/Register';
+import { Login, Register } from './pages/Auth/Auth';
 import Dashboard from './pages/Dashboard';
-import './pages/PageStyles.css';
 import Complaints from './pages/Complaints';
 import Amenities from './pages/Amenities';
 import Announcements from './pages/Announcements';
@@ -13,7 +11,7 @@ import Visitors from './pages/Visitors';
 import Payments from './pages/Payments';
 import Profile from './pages/Profile';
 
-function App() {
+export default function App() {
   return (
     <AuthProvider>
       <Routes>
@@ -22,7 +20,6 @@ function App() {
           <Route path="register" element={<Register />} />
           <Route index element={<Navigate to="login" replace />} />
         </Route>
-
         <Route element={<ProtectedRoute />}>
           <Route element={<MainLayout />}>
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
@@ -35,11 +32,8 @@ function App() {
             <Route path="profile" element={<Profile />} />
           </Route>
         </Route>
-
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
     </AuthProvider>
   );
 }
-
-export default App;

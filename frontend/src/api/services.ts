@@ -1,108 +1,46 @@
-import api from './apiClient';
-import type {
-  Announcement,
-  Amenity,
-  AmenityBooking,
-  BookingRequest,
-  BookingStatus,
-  Complaint,
-  CreateAnnouncementRequest,
-  CreateAmenityRequest,
-  CreateComplaintRequest,
-  CreateVisitorRequest,
-  Payment,
-  UpdateBookingStatusRequest,
-  UpdateComplaintStatusRequest,
-  UpdateProfileRequest,
-  User,
-  Visitor
-} from '../types';
+import axios from 'axios';
+import type { Amenity, AmenityBooking, Announcement, Complaint, Payment, User, Visitor, BookingRequest, BookingStatus, ComplaintStatus, CreateAmenityRequest, CreateAnnouncementRequest, CreateComplaintRequest, CreateVisitorRequest, UpdateProfileRequest } from '../types';
 
-export async function getAnnouncements() {
-  const response = await api.get<{ success: boolean; message: string; data: Announcement[] }>('/announcements');
-  return response.data.data;
-}
+const api = axios.create({
+  baseURL: (import.meta as any).env?.VITE_API_URL || 'http://localhost:8080/api',
+  headers: { 'Content-Type': 'application/json' }
+});
 
-export async function createAnnouncement(payload: CreateAnnouncementRequest) {
-  const response = await api.post<{ success: boolean; message: string; data: Announcement }>('/announcements', payload);
-  return response.data.data;
-}
+api.interceptors.request.use((config) => {
+  const raw = localStorage.getItem('ams_auth');
+  if (raw) {
+    try {
+      const auth = JSON.parse(raw);
+      config.headers = { ...config.headers, Authorization: `Bearer ${auth.token}` } as any;
+    } catch { localStorage.removeItem('ams_auth'); }
+  }
+  return config;
+});
 
-export async function deleteAnnouncement(id: number) {
-  const response = await api.delete<{ success: boolean; message: string; data: void }>(`/announcements/${id}`);
-  return response.data;
-}
+const d = <T>(r: { data: { data: T } }) => r.data.data;
 
-export async function getAmenities() {
-  const response = await api.get<{ success: boolean; message: string; data: Amenity[] }>('/amenities');
-  return response.data.data;
-}
+export const getAnnouncements = () => api.get<any>('/announcements').then(d<Announcement[]>);
+export const createAnnouncement = (p: CreateAnnouncementRequest) => api.post<any>('/announcements', p).then(d<Announcement>);
+export const deleteAnnouncement = (id: number) => api.delete(`/announcements/${id}`);
 
-export async function createAmenity(payload: CreateAmenityRequest) {
-  const response = await api.post<{ success: boolean; message: string; data: Amenity }>('/amenities', payload);
-  return response.data.data;
-}
+export const getAmenities = () => api.get<any>('/amenities').then(d<Amenity[]>);
+export const createAmenity = (p: CreateAmenityRequest) => api.post<any>('/amenities', p).then(d<Amenity>);
+export const getBookings = (role: string) => api.get<any>(role === 'RESIDENT' ? '/amenities/bookings/my' : '/amenities/bookings').then(d<AmenityBooking[]>);
+export const bookAmenity = (id: number, p: BookingRequest) => api.post<any>(`/amenities/${id}/book`, p).then(d<AmenityBooking>);
+export const updateBookingStatus = (id: number, p: { status: BookingStatus }) => api.put<any>(`/amenities/bookings/${id}/status`, p).then(d<AmenityBooking>);
 
-export async function getBookings(role: string) {
-  const path = role === 'RESIDENT' ? '/amenities/bookings/my' : '/amenities/bookings';
-  const response = await api.get<{ success: boolean; message: string; data: AmenityBooking[] }>(path);
-  return response.data.data;
-}
+export const getComplaints = (role: string) => api.get<any>(role === 'RESIDENT' ? '/complaints/my' : '/complaints').then(d<Complaint[]>);
+export const createComplaint = (p: CreateComplaintRequest) => api.post<any>('/complaints', p).then(d<Complaint>);
+export const updateComplaintStatus = (id: number, p: { status: ComplaintStatus }) => api.put<any>(`/complaints/${id}/status`, p).then(d<Complaint>);
 
-export async function bookAmenity(amenityId: number, payload: BookingRequest) {
-  const response = await api.post<{ success: boolean; message: string; data: AmenityBooking }>(`/amenities/${amenityId}/book`, payload);
-  return response.data.data;
-}
+export const getPayments = (role: string) => api.get<any>(role === 'RESIDENT' ? '/payments/my' : '/payments/pending').then(d<Payment[]>);
 
-export async function updateBookingStatus(id: number, payload: UpdateBookingStatusRequest) {
-  const response = await api.put<{ success: boolean; message: string; data: AmenityBooking }>(`/amenities/bookings/${id}/status`, payload);
-  return response.data.data;
-}
+export const getVisitors = (role: string) => api.get<any>(role === 'ADMIN' ? '/visitors' : '/visitors/active').then(d<Visitor[]>);
+export const logVisitorEntry = (p: CreateVisitorRequest) => api.post<any>('/visitors', p).then(d<Visitor>);
+export const logVisitorExit = (id: number) => api.put<any>(`/visitors/${id}/exit`, {}).then(d<Visitor>);
 
-export async function getComplaints(role: string) {
-  const path = role === 'RESIDENT' ? '/complaints/my' : '/complaints';
-  const response = await api.get<{ success: boolean; message: string; data: Complaint[] }>(path);
-  return response.data.data;
-}
+export const getProfile = () => api.get<any>('/users/me').then(d<User>);
+export const updateProfile = (p: UpdateProfileRequest) => api.put<any>('/users/me', p).then(d<User>);
 
-export async function createComplaint(payload: CreateComplaintRequest) {
-  const response = await api.post<{ success: boolean; message: string; data: Complaint }>('/complaints', payload);
-  return response.data.data;
-}
-
-export async function updateComplaintStatus(id: number, payload: UpdateComplaintStatusRequest) {
-  const response = await api.put<{ success: boolean; message: string; data: Complaint }>(`/complaints/${id}/status`, payload);
-  return response.data.data;
-}
-
-export async function getPayments(role: string) {
-  const path = role === 'RESIDENT' ? '/payments/my' : '/payments/pending';
-  const response = await api.get<{ success: boolean; message: string; data: Payment[] }>(path);
-  return response.data.data;
-}
-
-export async function getVisitors(role: string) {
-  const path = role === 'ADMIN' ? '/visitors' : '/visitors/active';
-  const response = await api.get<{ success: boolean; message: string; data: Visitor[] }>(path);
-  return response.data.data;
-}
-
-export async function logVisitorEntry(payload: CreateVisitorRequest) {
-  const response = await api.post<{ success: boolean; message: string; data: Visitor }>('/visitors', payload);
-  return response.data.data;
-}
-
-export async function logVisitorExit(id: number) {
-  const response = await api.put<{ success: boolean; message: string; data: Visitor }>(`/visitors/${id}/exit`, {});
-  return response.data.data;
-}
-
-export async function getProfile() {
-  const response = await api.get<{ success: boolean; message: string; data: User }>('/users/me');
-  return response.data.data;
-}
-
-export async function updateProfile(payload: UpdateProfileRequest) {
-  const response = await api.put<{ success: boolean; message: string; data: User }>('/users/me', payload);
-  return response.data.data;
-}
+export const authLogin = (p: { email: string; password: string }) => api.post<any>('/auth/login', p).then(r => r.data.data);
+export const authRegister = (p: any) => api.post<any>('/auth/register', p).then(r => r.data.data);

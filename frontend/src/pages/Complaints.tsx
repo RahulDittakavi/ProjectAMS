@@ -4,12 +4,10 @@ import { createComplaint, getComplaints, updateComplaintStatus } from '../api/se
 import type { Complaint, ComplaintCategory, ComplaintStatus } from '../types';
 import Modal from '../components/Modal';
 
-const categories: ComplaintCategory[] = ['PLUMBING', 'ELECTRICAL', 'CLEANING', 'NOISE', 'OTHER'];
-const statuses: ComplaintStatus[] = ['OPEN', 'IN_PROGRESS', 'RESOLVED'];
-
-function formatStatus(status: string) {
-  return status.replace(/_/g, ' ');
-}
+const CATS: ComplaintCategory[] = ['PLUMBING','ELECTRICAL','CLEANING','NOISE','OTHER'];
+const STATUSES: ComplaintStatus[] = ['OPEN','IN_PROGRESS','RESOLVED'];
+const CAT_ICONS: Record<string, string> = { PLUMBING:'🔧', ELECTRICAL:'⚡', CLEANING:'🧹', NOISE:'🔊', OTHER:'📋' };
+const fmt = (s: string) => s.replace(/_/g,' ');
 
 export default function Complaints() {
   const { user } = useAuth();
@@ -17,115 +15,93 @@ export default function Complaints() {
   const isAdmin = user?.role === 'ADMIN';
 
   const [complaints, setComplaints] = useState<Complaint[]>([]);
-  const [title, setTitle] = useState('');
-  const [category, setCategory] = useState<ComplaintCategory>('PLUMBING');
-  const [description, setDescription] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+
+  const [modalOpen, setModalOpen] = useState(false);
   const [statusModalOpen, setStatusModalOpen] = useState(false);
   const [activeComplaint, setActiveComplaint] = useState<Complaint | null>(null);
   const [selectedStatus, setSelectedStatus] = useState<ComplaintStatus>('OPEN');
   const [submitting, setSubmitting] = useState(false);
 
-  useEffect(() => {
-    async function load() {
-      setLoading(true);
-      try {
-        setComplaints(await getComplaints(user?.role ?? 'RESIDENT'));
-      } catch {
-        setError('Unable to load complaints.');
-      } finally {
-        setLoading(false);
-      }
-    }
+  const [form, setForm] = useState({ title: '', description: '', category: 'PLUMBING' as ComplaintCategory });
+  const setF = (k: string) => (e: any) => setForm(f => ({ ...f, [k]: e.target.value }));
 
-    load();
-  }, [user]);
-
-  const refresh = async () => {
-    setComplaints(await getComplaints(user?.role ?? 'RESIDENT'));
+  const load = async () => {
+    setLoading(true);
+    try { setComplaints(await getComplaints(user?.role ?? 'RESIDENT')); }
+    catch { setError('Failed to load complaints.'); }
+    finally { setLoading(false); }
   };
 
-  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    setError('');
-    setSubmitting(true);
+  useEffect(() => { load(); }, [user]);
 
+  const handleCreate = async (e: FormEvent) => {
+    e.preventDefault(); setError(''); setSubmitting(true);
     try {
-      await createComplaint({ title, description, category });
-      setTitle('');
-      setDescription('');
-      await refresh();
-    } catch {
-      setError('Could not submit complaint.');
-    } finally {
-      setSubmitting(false);
-    }
+      await createComplaint(form);
+      setSuccess('Complaint submitted successfully.');
+      setModalOpen(false);
+      setForm({ title: '', description: '', category: 'PLUMBING' });
+      await load();
+    } catch { setError('Failed to submit complaint.'); }
+    finally { setSubmitting(false); }
   };
 
-  const openStatusModal = (complaint: Complaint) => {
-    setActiveComplaint(complaint);
-    setSelectedStatus(complaint.status);
-    setStatusModalOpen(true);
-  };
-
-  const handleStatusUpdate = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
+  const handleStatusUpdate = async (e: FormEvent) => {
+    e.preventDefault();
     if (!activeComplaint) return;
-
-    setSubmitting(true);
-    setError('');
-
+    setSubmitting(true); setError('');
     try {
       await updateComplaintStatus(activeComplaint.id, { status: selectedStatus });
-      setStatusModalOpen(false);
-      await refresh();
-    } catch {
-      setError('Could not update complaint status.');
-    } finally {
-      setSubmitting(false);
-    }
+      setSuccess('Status updated.'); setStatusModalOpen(false); await load();
+    } catch { setError('Failed to update status.'); }
+    finally { setSubmitting(false); }
   };
 
+  const openCount = complaints.filter(c => c.status === 'OPEN').length;
+  const inProgressCount = complaints.filter(c => c.status === 'IN_PROGRESS').length;
+  const resolvedCount = complaints.filter(c => c.status === 'RESOLVED').length;
+
   return (
-    <div>
+    <div className="animate-in" style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
       <div className="page-header">
-        <h1>Complaints</h1>
+        <div>
+          <h1 className="page-title">Complaints</h1>
+          <p className="page-subtitle">{isAdmin ? 'Manage and resolve resident complaints' : 'Track your submitted complaints'}</p>
+        </div>
+        {isResident && <button className="btn btn-gold" onClick={() => setModalOpen(true)}>+ New Complaint</button>}
       </div>
 
-      {error && <div className="form-error">{error}</div>}
+      {error && <div className="alert alert-error">{error}</div>}
+      {success && <div className="alert alert-success">{success}</div>}
 
-      {isResident && (
-        <div className="panel">
-          <h2>Submit a Complaint</h2>
-          <form onSubmit={handleSubmit} className="panel-form">
-            <label>
-              Title
-              <input value={title} onChange={(e) => setTitle(e.target.value)} required />
-            </label>
-            <label>
-              Category
-              <select value={category} onChange={(e) => setCategory(e.target.value as ComplaintCategory)}>
-                {categories.map((option) => (
-                  <option key={option} value={option}>{option}</option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Description
-              <textarea value={description} onChange={(e) => setDescription(e.target.value)} required />
-            </label>
-            <button type="submit" disabled={submitting}>{submitting ? 'Submitting...' : 'Submit Complaint'}</button>
-          </form>
+      {/* Stats */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
+        {[
+          { label: 'Open', count: openCount, cls: 'badge-open' },
+          { label: 'In Progress', count: inProgressCount, cls: 'badge-in_progress' },
+          { label: 'Resolved', count: resolvedCount, cls: 'badge-resolved' },
+        ].map(s => (
+          <div key={s.label} className="card" style={{ textAlign: 'center', padding: '20px' }}>
+            <div style={{ fontFamily: "'Playfair Display', serif", fontSize: '2rem', fontWeight: 700, color: 'var(--text-primary)' }}>{s.count}</div>
+            <div style={{ marginTop: 8 }}><span className={`badge ${s.cls}`}>{s.label}</span></div>
+          </div>
+        ))}
+      </div>
+
+      <div className="card">
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+          <h2 style={{ fontFamily: "'Playfair Display', serif", fontSize: '1.3rem' }}>{isAdmin ? 'All Complaints' : 'Your Complaints'}</h2>
+          <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{complaints.length} total</span>
         </div>
-      )}
-
-      <div className="panel">
-        <h2>{isAdmin ? 'All Complaints' : 'Your Complaints'}</h2>
-        {complaints.length === 0 ? (
-          <div className="empty-state">No complaints found.</div>
+        {loading ? (
+          <div className="empty-state"><div className="spinner" style={{ width: 32, height: 32, margin: '0 auto' }} /></div>
+        ) : complaints.length === 0 ? (
+          <div className="empty-state"><div className="empty-icon">📋</div><div className="empty-text">No complaints found</div></div>
         ) : (
-          <div className="table-scroll">
+          <div className="table-wrap">
             <table>
               <thead>
                 <tr>
@@ -134,28 +110,25 @@ export default function Complaints() {
                   <th>Category</th>
                   <th>Status</th>
                   <th>Updated</th>
-                  {isAdmin && <th>Actions</th>}
+                  {isAdmin && <th>Action</th>}
                 </tr>
               </thead>
               <tbody>
-                {complaints.map((complaint) => (
-                  <tr key={complaint.id}>
-                    <td>{complaint.title}</td>
-                    {isAdmin && <td>{complaint.residentName}</td>}
-                    <td>{complaint.category}</td>
+                {complaints.map(c => (
+                  <tr key={c.id}>
                     <td>
-                      <span className={`status-badge badge-${complaint.status.toLowerCase()}`}>{formatStatus(complaint.status)}</span>
+                      <div style={{ fontWeight: 500, color: 'var(--text-primary)' }}>{c.title}</div>
+                      {c.description && <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: 2 }}>{c.description.slice(0, 60)}{c.description.length > 60 ? '…' : ''}</div>}
                     </td>
-                    <td>{new Date(complaint.updatedAt).toLocaleDateString()}</td>
+                    {isAdmin && <td>{c.residentName}</td>}
+                    <td><span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>{CAT_ICONS[c.category]} {c.category}</span></td>
+                    <td><span className={`badge badge-${c.status.toLowerCase()}`}>{fmt(c.status)}</span></td>
+                    <td>{new Date(c.updatedAt).toLocaleDateString()}</td>
                     {isAdmin && (
                       <td>
-                        {complaint.status !== 'RESOLVED' ? (
-                          <button type="button" className="secondary-button" onClick={() => openStatusModal(complaint)}>
-                            Update Status
-                          </button>
-                        ) : (
-                          <span>Resolved</span>
-                        )}
+                        {c.status !== 'RESOLVED' ? (
+                          <button className="btn btn-ghost btn-sm" onClick={() => { setActiveComplaint(c); setSelectedStatus(c.status); setStatusModalOpen(true); }}>Update</button>
+                        ) : <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Closed</span>}
                       </td>
                     )}
                   </tr>
@@ -166,28 +139,34 @@ export default function Complaints() {
         )}
       </div>
 
-      <Modal
-        open={statusModalOpen}
-        title="Update Status"
-        onClose={() => setStatusModalOpen(false)}
-        footer={
-          <>
-            <button type="button" className="secondary-button" onClick={() => setStatusModalOpen(false)}>
-              Cancel
-            </button>
-            <button type="submit" form="status-form" className="primary-button" disabled={submitting}>
-              {submitting ? 'Saving...' : 'Save'}
-            </button>
-          </>
-        }
-      >
-        <form id="status-form" onSubmit={handleStatusUpdate} className="panel-form">
-          <label>
-            Status
-            <select value={selectedStatus} onChange={(event) => setSelectedStatus(event.target.value as ComplaintStatus)}>
-              {statuses.map((option) => (
-                <option key={option} value={option}>{formatStatus(option)}</option>
-              ))}
+      <Modal open={modalOpen} title="New Complaint" onClose={() => setModalOpen(false)}
+        footer={<>
+          <button className="btn btn-ghost" onClick={() => setModalOpen(false)}>Cancel</button>
+          <button className="btn btn-gold" type="submit" form="complaint-form" disabled={submitting}>{submitting ? <><span className="spinner" />Submitting…</> : 'Submit'}</button>
+        </>}>
+        <form id="complaint-form" onSubmit={handleCreate} className="form-grid">
+          <label>Title <input value={form.title} onChange={setF('title')} placeholder="Brief description of the issue" required /></label>
+          <label>Category
+            <select value={form.category} onChange={setF('category')}>
+              {CATS.map(c => <option key={c} value={c}>{CAT_ICONS[c]} {c}</option>)}
+            </select>
+          </label>
+          <label>Description <textarea value={form.description} onChange={setF('description')} placeholder="Detailed description…" /></label>
+        </form>
+      </Modal>
+
+      <Modal open={statusModalOpen} title="Update Status" onClose={() => setStatusModalOpen(false)}
+        footer={<>
+          <button className="btn btn-ghost" onClick={() => setStatusModalOpen(false)}>Cancel</button>
+          <button className="btn btn-gold" type="submit" form="status-form" disabled={submitting}>{submitting ? <><span className="spinner" />Saving…</> : 'Save'}</button>
+        </>}>
+        <form id="status-form" onSubmit={handleStatusUpdate} className="form-grid">
+          <div style={{ padding: '12px 0', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
+            <strong style={{ color: 'var(--text-primary)' }}>{activeComplaint?.title}</strong>
+          </div>
+          <label>New Status
+            <select value={selectedStatus} onChange={e => setSelectedStatus(e.target.value as ComplaintStatus)}>
+              {STATUSES.map(s => <option key={s} value={s}>{fmt(s)}</option>)}
             </select>
           </label>
         </form>

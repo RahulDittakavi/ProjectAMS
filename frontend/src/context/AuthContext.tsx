@@ -1,19 +1,11 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
-import api from '../api/apiClient';
-import type { AuthResponse, LoginRequest, RegisterRequest, User } from '../types';
+import type { AuthResponse, User } from '../types';
+import { authLogin, authRegister } from '../api/services';
 
-interface AuthContextValue {
-  user: User | null;
-  token: string | null;
-  loading: boolean;
-  login: (payload: LoginRequest) => Promise<void>;
-  register: (payload: RegisterRequest) => Promise<void>;
-  logout: () => void;
-}
+interface AuthCtx { user: User | null; token: string | null; loading: boolean; login: (e: string, p: string) => Promise<void>; register: (payload: any) => Promise<void>; logout: () => void; }
 
-const AuthContext = createContext<AuthContextValue | undefined>(undefined);
-
-const STORAGE_KEY = 'ams_auth';
+const Ctx = createContext<AuthCtx | undefined>(undefined);
+const KEY = 'ams_auth';
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -21,61 +13,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      try {
-        const auth = JSON.parse(stored) as AuthResponse;
-        setUser(auth.user);
-        setToken(auth.token);
-      } catch {
-        localStorage.removeItem(STORAGE_KEY);
-      }
-    }
+    const stored = localStorage.getItem(KEY);
+    if (stored) { try { const a = JSON.parse(stored) as AuthResponse; setUser(a.user); setToken(a.token); } catch { localStorage.removeItem(KEY); } }
     setLoading(false);
   }, []);
 
-  const login = async (payload: LoginRequest) => {
-    const response = await api.post<{ success: boolean; message: string; data: AuthResponse }>('/auth/login', payload);
-    if (response.data.success) {
-      const auth = response.data.data;
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(auth));
-      setUser(auth.user);
-      setToken(auth.token);
-    } else {
-      throw new Error(response.data.message || 'Login failed');
-    }
-  };
+  const save = (auth: AuthResponse) => { localStorage.setItem(KEY, JSON.stringify(auth)); setUser(auth.user); setToken(auth.token); };
 
-  const register = async (payload: RegisterRequest) => {
-    const response = await api.post<{ success: boolean; message: string; data: AuthResponse }>('/auth/register', payload);
-    if (response.data.success) {
-      const auth = response.data.data;
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(auth));
-      setUser(auth.user);
-      setToken(auth.token);
-    } else {
-      throw new Error(response.data.message || 'Registration failed');
-    }
-  };
+  const login = async (email: string, password: string) => { const a = await authLogin({ email, password }); save(a); };
+  const register = async (payload: any) => { const a = await authRegister(payload); save(a); };
+  const logout = () => { localStorage.removeItem(KEY); setUser(null); setToken(null); };
 
-  const logout = () => {
-    localStorage.removeItem(STORAGE_KEY);
-    setUser(null);
-    setToken(null);
-  };
-
-  const value = useMemo(
-    () => ({ user, token, loading, login, register, logout }),
-    [user, token, loading]
-  );
-
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  const value = useMemo(() => ({ user, token, loading, login, register, logout }), [user, token, loading]);
+  return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 
-export function useAuth() {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within AuthProvider');
-  }
-  return context;
-}
+export const useAuth = () => { const c = useContext(Ctx); if (!c) throw new Error('useAuth outside provider'); return c; };
