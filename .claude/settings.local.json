@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(Get-ChildItem -Recurse \"c:\\\\ProjectAMS\\\\frontend\" -File)",
+      "Bash(Measure-Object)",
+      "Bash(Select-Object -ExpandProperty Count)",
+      "Bash(git checkout *)",
+      "Bash(git add *)"
+    ]
+  }
+}
