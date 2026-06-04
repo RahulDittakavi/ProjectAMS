@@ -1,0 +1,8 @@
+node_modules/
+target/
+dist/
+.angular/
+.idea/
+.vscode/
+src/main/resources/application.properties/
+*.class
