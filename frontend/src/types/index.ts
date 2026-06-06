@@ -23,7 +23,14 @@ export interface UpdateBookingStatusRequest { status: BookingStatus; }
 
 export type PaymentType = 'MAINTENANCE' | 'AMENITY_BOOKING';
 export type PaymentStatus = 'PENDING' | 'SUCCESS' | 'FAILED';
-export interface Payment { id: number; residentId: number; residentName: string; amount: number; paymentType: PaymentType; status: PaymentStatus; razorpayOrderId: string; razorpayPaymentId: string; month: string; createdAt: string; }
+export interface Payment { id: number; residentId: number; residentName: string; amount: number; paymentType: PaymentType; status: PaymentStatus; razorpayOrderId: string; razorpayPaymentId: string; month: string; billId: number | null; paidAt: string | null; createdAt: string; }
+
+export type BillStatus = 'UNPAID' | 'PAID' | 'OVERDUE';
+export interface Bill { id: number; residentId: number; residentName: string; flatNumber: string; block: string; billingMonth: string; amount: number; dueDate: string; status: BillStatus; createdAt: string; paidAt: string | null; }
+export interface MaintenanceConfig { id: number; block: string | null; monthlyAmount: number; effectiveFrom: string; createdAt: string; }
+export interface CollectionSummary { month: string; totalBills: number; paidCount: number; defaulterCount: number; collectedAmount: number; defaulters: Bill[]; }
+export interface CreateOrderRequest { amount?: number; paymentType: PaymentType; month?: string; billId?: number; }
+export interface VerifyPaymentRequest { razorpayOrderId: string; razorpayPaymentId: string; razorpaySignature: string; }
 
 export interface Visitor { id: number; name: string; phone: string; purpose: string; flatToVisit: string; loggedById: number; loggedByName: string; entryTime: string; exitTime: string | null; }
 export interface CreateVisitorRequest { name: string; phone: string; purpose: string; flatToVisit: string; }

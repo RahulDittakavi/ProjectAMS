@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { Amenity, AmenityBooking, Announcement, Complaint, Payment, User, Visitor, BookingRequest, BookingStatus, ComplaintStatus, CreateAmenityRequest, CreateAnnouncementRequest, CreateComplaintRequest, CreateVisitorRequest, UpdateProfileRequest } from '../types';
+import type { Amenity, AmenityBooking, Announcement, Bill, CollectionSummary, Complaint, CreateOrderRequest, MaintenanceConfig, Payment, User, VerifyPaymentRequest, Visitor, BookingRequest, BookingStatus, ComplaintStatus, CreateAmenityRequest, CreateAnnouncementRequest, CreateComplaintRequest, CreateVisitorRequest, UpdateProfileRequest } from '../types';
 
 const api = axios.create({
   baseURL: (import.meta as any).env?.VITE_API_URL || 'http://localhost:8080/api',
@@ -34,6 +34,15 @@ export const createComplaint = (p: CreateComplaintRequest) => api.post<any>('/co
 export const updateComplaintStatus = (id: number, p: { status: ComplaintStatus }) => api.put<any>(`/complaints/${id}/status`, p).then(d<Complaint>);
 
 export const getPayments = (role: string) => api.get<any>(role === 'RESIDENT' ? '/payments/my' : '/payments/pending').then(d<Payment[]>);
+export const createPaymentOrder = (p: CreateOrderRequest) => api.post<any>('/payments/create-order', p).then(d<{ paymentId: number; razorpayOrderId: string; amount: number; currency: string }>);
+export const verifyPayment = (p: VerifyPaymentRequest) => api.post<any>('/payments/verify', p).then(d<Payment>);
+
+export const getMyBills = () => api.get<any>('/bills/my').then(d<Bill[]>);
+export const getMyDues = () => api.get<any>('/bills/dues').then(d<Bill[]>);
+export const getBillReceipt = (id: number) => api.get<any>(`/bills/${id}/receipt`).then(d<Bill>);
+export const generateBills = (month: string) => api.post<any>(`/bills/generate?month=${month}`).then(d<string>);
+export const setMaintenanceConfig = (p: { monthlyAmount: number; block?: string | null; effectiveFrom: string }) => api.post<any>('/maintenance-config', p).then(d<MaintenanceConfig>);
+export const getCollections = (month: string) => api.get<any>(`/admin/collections?month=${month}`).then(d<CollectionSummary>);
 
 export const getVisitors = (role: string) => api.get<any>(role === 'ADMIN' ? '/visitors' : '/visitors/active').then(d<Visitor[]>);
 export const logVisitorEntry = (p: CreateVisitorRequest) => api.post<any>('/visitors', p).then(d<Visitor>);

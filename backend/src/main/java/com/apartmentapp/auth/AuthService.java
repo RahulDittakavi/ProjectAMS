@@ -32,8 +32,8 @@ public class AuthService {
                 .flatNumber(request.getFlatNumber())
                 .block(request.getBlock())
                 .build();
-        userRepository.save(user);
-        String token = jwtUtil.generateToken(user.getEmail(), user.getRole().name());
+        user = userRepository.save(user);
+        String token = jwtUtil.generateToken(user.getEmail(), user.getRole().name(), user.getId(), user.getName());
         return new AuthDTO.AuthResponse(token, UserService.mapToResponse(user));
     }
 
@@ -42,7 +42,7 @@ public class AuthService {
                 new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword()));
         User user = userRepository.findByEmail(request.getEmail())
                 .orElseThrow(() -> new RuntimeException("User not found"));
-        String token = jwtUtil.generateToken(user.getEmail(), user.getRole().name());
+        String token = jwtUtil.generateToken(user.getEmail(), user.getRole().name(), user.getId(), user.getName());
         return new AuthDTO.AuthResponse(token, UserService.mapToResponse(user));
     }
 }

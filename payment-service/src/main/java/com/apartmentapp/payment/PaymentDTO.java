@@ -1,6 +1,5 @@
 package com.apartmentapp.payment;
 
-import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 import lombok.*;
@@ -10,38 +9,25 @@ import java.time.LocalDateTime;
 
 public class PaymentDTO {
 
-    @Data
-    @NoArgsConstructor
-    @AllArgsConstructor
+    @Data @NoArgsConstructor @AllArgsConstructor
     public static class CreateOrderRequest {
-        @NotNull(message = "Amount is required")
-        @Positive(message = "Amount must be positive")
         private BigDecimal amount;
 
         @NotNull(message = "Payment type is required")
         private PaymentType paymentType;
 
         private String month;
+        private Long billId;
     }
 
-    @Data
-    @NoArgsConstructor
-    @AllArgsConstructor
+    @Data @NoArgsConstructor @AllArgsConstructor
     public static class VerifyPaymentRequest {
-        @NotBlank(message = "Razorpay order ID is required")
         private String razorpayOrderId;
-
-        @NotBlank(message = "Razorpay payment ID is required")
         private String razorpayPaymentId;
-
-        @NotBlank(message = "Razorpay signature is required")
         private String razorpaySignature;
     }
 
-    @Data
-    @Builder
-    @NoArgsConstructor
-    @AllArgsConstructor
+    @Data @Builder @NoArgsConstructor @AllArgsConstructor
     public static class OrderResponse {
         private Long paymentId;
         private String razorpayOrderId;
@@ -49,10 +35,7 @@ public class PaymentDTO {
         private String currency;
     }
 
-    @Data
-    @Builder
-    @NoArgsConstructor
-    @AllArgsConstructor
+    @Data @Builder @NoArgsConstructor @AllArgsConstructor
     public static class Response {
         private Long id;
         private Long residentId;
@@ -63,6 +46,8 @@ public class PaymentDTO {
         private String razorpayOrderId;
         private String razorpayPaymentId;
         private String month;
+        private Long billId;
+        private LocalDateTime paidAt;
         private LocalDateTime createdAt;
     }
 }

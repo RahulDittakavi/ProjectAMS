@@ -1,9 +1,8 @@
-package com.apartmentapp.auth;
+package com.apartmentapp.security;
 
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -17,33 +16,32 @@ public class JwtUtil {
     @Value("${jwt.secret}")
     private String secret;
 
-    @Value("${jwt.expiration}")
-    private long expiration;
-
     private Key getSigningKey() {
         return Keys.hmacShaKeyFor(secret.getBytes());
-    }
-
-    public String generateToken(String email, String role, Long userId, String name) {
-        return Jwts.builder()
-                .setSubject(email)
-                .claim("role", role)
-                .claim("userId", userId)
-                .claim("name", name)
-                .setIssuedAt(new Date())
-                .setExpiration(new Date(System.currentTimeMillis() + expiration))
-                .signWith(getSigningKey(), SignatureAlgorithm.HS256)
-                .compact();
     }
 
     public String extractEmail(String token) {
         return getClaims(token).getSubject();
     }
 
+    public String extractRole(String token) {
+        return (String) getClaims(token).get("role");
+    }
+
+    public Long extractUserId(String token) {
+        Object id = getClaims(token).get("userId");
+        if (id instanceof Integer) return ((Integer) id).longValue();
+        if (id instanceof Long)    return (Long) id;
+        return null;
+    }
+
+    public String extractName(String token) {
+        return (String) getClaims(token).get("name");
+    }
+
     public boolean isTokenValid(String token) {
         try {
-            Date expiry = getClaims(token).getExpiration();
-            return expiry.after(new Date());
+            return getClaims(token).getExpiration().after(new Date());
         } catch (JwtException | IllegalArgumentException e) {
             return false;
         }

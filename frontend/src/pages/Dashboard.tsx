@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { getComplaints, getAnnouncements, getBookings } from '../api/services';
+import { getComplaints, getAnnouncements, getBookings, getMyDues } from '../api/services';
 import { StatCard, Card } from '../components/ui';
 
 const NAV_CARDS = [
@@ -24,19 +24,22 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const isAdmin = user?.role === 'ADMIN';
 
-  const [stats, setStats] = useState({ openComplaints: 0, totalComplaints: 0, myBookings: 0, announcements: 0 });
+  const [stats, setStats] = useState({ openComplaints: 0, totalComplaints: 0, myBookings: 0, announcements: 0, unpaidDues: 0 });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!user) return;
+    const isResident = user.role === 'RESIDENT';
     Promise.allSettled([
       getComplaints(user.role),
       getBookings(user.role),
       getAnnouncements(),
-    ]).then(([complaints, bookings, announcements]) => {
+      isResident ? getMyDues() : Promise.resolve([]),
+    ]).then(([complaints, bookings, announcements, dues]) => {
       const cList = complaints.status === 'fulfilled' ? complaints.value : [];
       const bList = bookings.status   === 'fulfilled' ? bookings.value   : [];
       const aList = announcements.status === 'fulfilled' ? announcements.value : [];
+      const dList = dues.status       === 'fulfilled' ? dues.value       : [];
       const today = new Date().toISOString().slice(0, 10);
       setStats({
         openComplaints: cList.filter((c: any) => c.status === 'OPEN').length,
@@ -45,6 +48,7 @@ export default function Dashboard() {
           (b.status === 'PENDING' || b.status === 'APPROVED') && b.bookingDate >= today
         ).length,
         announcements: aList.length,
+        unpaidDues: dList.length,
       });
     }).finally(() => setLoading(false));
   }, [user]);
@@ -91,7 +95,7 @@ export default function Dashboard() {
               <StatCard label="Open Complaints"     value={stats.openComplaints}  icon={<AlertIcon />}    color="red" />
               <StatCard label="Upcoming Bookings"   value={stats.myBookings}      icon={<CalIcon />}      color="green" />
               <StatCard label="Announcements"       value={stats.announcements}   icon={<BellIcon />}     color="blue" />
-              <StatCard label="My Dues" value="—" icon={<CardIcon />} color="amber" subtitle="Billing coming soon" />
+              <StatCard label="Unpaid Dues" value={stats.unpaidDues} icon={<CardIcon />} color={stats.unpaidDues > 0 ? 'amber' : 'green'} />
             </>
           )}
         </div>

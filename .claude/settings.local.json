@@ -5,7 +5,23 @@
       "Bash(Measure-Object)",
       "Bash(Select-Object -ExpandProperty Count)",
       "Bash(git checkout *)",
-      "Bash(git add *)"
+      "Bash(git add *)",
+      "PowerShell(Get-ChildItem -Path \"C:\\\\ProjectAMS-main\\\\Backend\\\\src\\\\main\\\\java\\\\com\\\\apartmentapp\" -Recurse | Where-Object { $_.Extension -eq '.java' } | Sort-Object FullName | Format-Table -Property FullName -AutoSize)",
+      "Bash(mkdir -p /c/ProjectAMS-main/Backend/src/main/java/com/apartmentapp/billing)",
+      "Bash(mvn compile *)",
+      "Bash(npx tsc *)",
+      "Bash(npm run *)",
+      "Bash(xargs cat)",
+      "Bash(mkdir -p /c/ProjectAMS-main/payment-service/src/main/java/com/apartmentapp/payment/security)",
+      "Bash(mkdir -p /c/ProjectAMS-main/payment-service/src/main/java/com/apartmentapp/payment/billing)",
+      "Bash(mkdir -p /c/ProjectAMS-main/payment-service/src/main/java/com/apartmentapp/payment/payments)",
+      "Bash(mkdir -p /c/ProjectAMS-main/payment-service/src/main/java/com/apartmentapp/payment/config)",
+      "Bash(mkdir -p /c/ProjectAMS-main/payment-service/src/main/resources)",
+      "Bash(rm -rf /c/ProjectAMS-main/payment-service/src)",
+      "Bash(mkdir -p /c/ProjectAMS-main/payment-service/src/main/java/com/apartmentapp/security /c/ProjectAMS-main/payment-service/src/main/java/com/apartmentapp/billing /c/ProjectAMS-main/payment-service/src/main/java/com/apartmentapp/payment /c/ProjectAMS-main/payment-service/src/main/java/com/apartmentapp/config /c/ProjectAMS-main/payment-service/src/main/resources)"
+    ],
+    "additionalDirectories": [
+      "C:\\ProjectAMS-main\\Backend\\src\\main\\java\\com\\apartmentapp"
     ]
   }
 }

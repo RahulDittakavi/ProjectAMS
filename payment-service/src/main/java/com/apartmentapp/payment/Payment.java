@@ -1,6 +1,6 @@
 package com.apartmentapp.payment;
 
-import com.apartmentapp.user.User;
+import com.apartmentapp.billing.Bill;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
@@ -20,9 +20,14 @@ public class Payment {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "resident_id", nullable = false)
-    private User resident;
+    @Column(name = "resident_id", nullable = false)
+    private Long residentId;
+
+    @Column(name = "resident_name", nullable = false)
+    private String residentName;
+
+    @Column(name = "resident_email", nullable = false)
+    private String residentEmail;
 
     @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal amount;
@@ -42,6 +47,13 @@ public class Payment {
     private String razorpayPaymentId;
 
     private String month;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "bill_id")
+    private Bill bill;
+
+    @Column(name = "paid_at")
+    private LocalDateTime paidAt;
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)

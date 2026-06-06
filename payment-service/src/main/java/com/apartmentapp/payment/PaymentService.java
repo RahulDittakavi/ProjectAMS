@@ -1,14 +1,16 @@
 package com.apartmentapp.payment;
 
-import com.apartmentapp.user.User;
-import com.apartmentapp.user.UserRepository;
+import com.apartmentapp.billing.Bill;
+import com.apartmentapp.billing.BillRepository;
+import com.apartmentapp.billing.BillService;
+import com.apartmentapp.billing.BillStatus;
+import com.apartmentapp.security.JwtPrincipal;
 import com.razorpay.Order;
 import com.razorpay.RazorpayClient;
 import com.razorpay.RazorpayException;
 import lombok.RequiredArgsConstructor;
 import org.json.JSONObject;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -16,6 +18,7 @@ import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDateTime;
 import java.util.HexFormat;
 import java.util.List;
 
@@ -24,7 +27,8 @@ import java.util.List;
 public class PaymentService {
 
     private final PaymentRepository paymentRepository;
-    private final UserRepository userRepository;
+    private final BillRepository billRepository;
+    private final BillService billService;
 
     @Value("${razorpay.key.id}")
     private String razorpayKeyId;
@@ -33,31 +37,49 @@ public class PaymentService {
     private String razorpayKeySecret;
 
     @Transactional
-    public PaymentDTO.OrderResponse createOrder(String email, PaymentDTO.CreateOrderRequest request) {
-        User resident = userRepository.findByEmail(email)
-                .orElseThrow(() -> new UsernameNotFoundException("User not found"));
+    public PaymentDTO.OrderResponse createOrder(JwtPrincipal principal, PaymentDTO.CreateOrderRequest request) {
+        Bill bill = null;
+        BigDecimal amount = request.getAmount();
+
+        if (request.getBillId() != null) {
+            bill = billRepository.findById(request.getBillId())
+                    .orElseThrow(() -> new RuntimeException("Bill not found"));
+            if (!bill.getResidentId().equals(principal.getUserId())) {
+                throw new RuntimeException("Bill does not belong to this resident");
+            }
+            if (bill.getStatus() == BillStatus.PAID) {
+                throw new RuntimeException("Bill is already paid");
+            }
+            amount = bill.getAmount();
+        }
+        if (amount == null) throw new RuntimeException("Amount is required");
+
         try {
             RazorpayClient client = new RazorpayClient(razorpayKeyId, razorpayKeySecret);
             JSONObject options = new JSONObject();
-            options.put("amount", request.getAmount().multiply(BigDecimal.valueOf(100)).intValue());
+            options.put("amount", amount.multiply(BigDecimal.valueOf(100)).intValue());
             options.put("currency", "INR");
             options.put("receipt", "rcpt_" + System.currentTimeMillis());
             Order razorpayOrder = client.orders.create(options);
             String rzpOrderId = razorpayOrder.get("id");
 
             Payment payment = Payment.builder()
-                    .resident(resident)
-                    .amount(request.getAmount())
+                    .residentId(principal.getUserId())
+                    .residentName(principal.getName())
+                    .residentEmail(principal.getEmail())
+                    .amount(amount)
                     .paymentType(request.getPaymentType())
                     .razorpayOrderId(rzpOrderId)
-                    .month(request.getMonth())
+                    .month(request.getMonth() != null ? request.getMonth()
+                            : (bill != null ? bill.getBillingMonth() : null))
+                    .bill(bill)
                     .build();
             Payment saved = paymentRepository.save(payment);
 
             return PaymentDTO.OrderResponse.builder()
                     .paymentId(saved.getId())
                     .razorpayOrderId(rzpOrderId)
-                    .amount(request.getAmount())
+                    .amount(amount)
                     .currency("INR")
                     .build();
         } catch (RazorpayException e) {
@@ -78,6 +100,10 @@ public class PaymentService {
             if (computed.equals(request.getRazorpaySignature())) {
                 payment.setRazorpayPaymentId(request.getRazorpayPaymentId());
                 payment.setStatus(PaymentStatus.SUCCESS);
+                payment.setPaidAt(LocalDateTime.now());
+                if (payment.getBill() != null) {
+                    billService.markBillPaid(payment.getBill().getId(), payment.getPaidAt());
+                }
             } else {
                 payment.setStatus(PaymentStatus.FAILED);
             }
@@ -87,10 +113,8 @@ public class PaymentService {
         }
     }
 
-    public List<PaymentDTO.Response> getMyPayments(String email) {
-        User resident = userRepository.findByEmail(email)
-                .orElseThrow(() -> new UsernameNotFoundException("User not found"));
-        return paymentRepository.findByResidentIdOrderByCreatedAtDesc(resident.getId())
+    public List<PaymentDTO.Response> getMyPayments(Long residentId) {
+        return paymentRepository.findByResidentIdOrderByCreatedAtDesc(residentId)
                 .stream().map(this::mapToResponse).toList();
     }
 
@@ -102,14 +126,16 @@ public class PaymentService {
     private PaymentDTO.Response mapToResponse(Payment p) {
         return PaymentDTO.Response.builder()
                 .id(p.getId())
-                .residentId(p.getResident().getId())
-                .residentName(p.getResident().getName())
+                .residentId(p.getResidentId())
+                .residentName(p.getResidentName())
                 .amount(p.getAmount())
                 .paymentType(p.getPaymentType())
                 .status(p.getStatus())
                 .razorpayOrderId(p.getRazorpayOrderId())
                 .razorpayPaymentId(p.getRazorpayPaymentId())
                 .month(p.getMonth())
+                .billId(p.getBill() != null ? p.getBill().getId() : null)
+                .paidAt(p.getPaidAt())
                 .createdAt(p.getCreatedAt())
                 .build();
     }
