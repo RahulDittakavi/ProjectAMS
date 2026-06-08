@@ -4,6 +4,8 @@ import com.apartmentapp.billing.Bill;
 import com.apartmentapp.billing.BillRepository;
 import com.apartmentapp.billing.BillService;
 import com.apartmentapp.billing.BillStatus;
+import com.apartmentapp.kafka.PaymentCompletedEvent;
+import com.apartmentapp.kafka.PaymentEventProducer;
 import com.apartmentapp.security.JwtPrincipal;
 import com.razorpay.Order;
 import com.razorpay.RazorpayClient;
@@ -29,6 +31,7 @@ public class PaymentService {
     private final PaymentRepository paymentRepository;
     private final BillRepository billRepository;
     private final BillService billService;
+    private final PaymentEventProducer eventProducer;
 
     @Value("${razorpay.key.id}")
     private String razorpayKeyId;
@@ -104,6 +107,19 @@ public class PaymentService {
                 if (payment.getBill() != null) {
                     billService.markBillPaid(payment.getBill().getId(), payment.getPaidAt());
                 }
+                Payment saved = paymentRepository.save(payment);
+                eventProducer.publishPaymentCompleted(PaymentCompletedEvent.builder()
+                        .eventType("payment.completed")
+                        .paymentId(saved.getId())
+                        .residentId(saved.getResidentId())
+                        .residentName(saved.getResidentName())
+                        .residentEmail(saved.getResidentEmail())
+                        .amount(saved.getAmount())
+                        .billingMonth(saved.getMonth())
+                        .razorpayPaymentId(saved.getRazorpayPaymentId())
+                        .paidAt(saved.getPaidAt())
+                        .build());
+                return mapToResponse(saved);
             } else {
                 payment.setStatus(PaymentStatus.FAILED);
             }
