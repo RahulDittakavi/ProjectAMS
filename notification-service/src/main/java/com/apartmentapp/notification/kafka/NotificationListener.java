@@ -19,8 +19,21 @@ public class NotificationListener {
 
         switch (event.getEventType()) {
             case "payment.completed" -> handlePaymentCompleted(event);
+            case "announcement.created" -> handleAnnouncementCreated(event);
             default -> log.debug("Unhandled event type: {}", event.getEventType());
         }
+    }
+
+    private void handleAnnouncementCreated(AmsEvent event) {
+        if (event.getRecipientEmails() == null || event.getRecipientEmails().isEmpty()) {
+            log.warn("announcement.created event has no recipients");
+            return;
+        }
+        for (String email : event.getRecipientEmails()) {
+            emailService.sendAnnouncementEmail(email, event.getTitle(),
+                    event.getContent(), event.getAdminName());
+        }
+        log.info("Announcement emails sent to {} residents", event.getRecipientEmails().size());
     }
 
     private void handlePaymentCompleted(AmsEvent event) {

@@ -28,4 +28,6 @@ public class AmsEvent {
     private String title;
     private String content;
     private String priority;
+    private String adminName;
+    private java.util.List<String> recipientEmails;
 }

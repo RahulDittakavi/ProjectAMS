@@ -1,5 +1,8 @@
 package com.apartmentapp.announcement;
 
+import com.apartmentapp.kafka.AnnouncementCreatedEvent;
+import com.apartmentapp.kafka.AnnouncementEventProducer;
+import com.apartmentapp.user.Role;
 import com.apartmentapp.user.User;
 import com.apartmentapp.user.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -15,6 +18,7 @@ public class AnnouncementService {
 
     private final AnnouncementRepository announcementRepository;
     private final UserRepository userRepository;
+    private final AnnouncementEventProducer eventProducer;
 
     @Transactional
     public AnnouncementDTO.Response createAnnouncement(String email, AnnouncementDTO.CreateRequest request) {
@@ -26,7 +30,24 @@ public class AnnouncementService {
                 .content(request.getContent())
                 .priority(request.getPriority() != null ? request.getPriority() : AnnouncementPriority.NORMAL)
                 .build();
-        return mapToResponse(announcementRepository.save(announcement));
+        Announcement saved = announcementRepository.save(announcement);
+
+        if (saved.getPriority() == AnnouncementPriority.URGENT) {
+            List<String> emails = userRepository.findByRoleAndIsActiveTrue(Role.RESIDENT)
+                    .stream().map(User::getEmail).toList();
+            if (!emails.isEmpty()) {
+                eventProducer.publishAnnouncementCreated(AnnouncementCreatedEvent.builder()
+                        .eventType("announcement.created")
+                        .title(saved.getTitle())
+                        .content(saved.getContent())
+                        .priority(saved.getPriority().name())
+                        .adminName(admin.getName())
+                        .recipientEmails(emails)
+                        .build());
+            }
+        }
+
+        return mapToResponse(saved);
     }
 
     public List<AnnouncementDTO.Response> getAllAnnouncements() {

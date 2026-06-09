@@ -41,6 +41,33 @@ public class EmailService {
         }
     }
 
+    public void sendAnnouncementEmail(String toEmail, String title, String content, String adminName) {
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+            helper.setFrom(fromEmail);
+            helper.setTo(toEmail);
+            helper.setSubject("[AMS Announcement] " + title);
+            helper.setText(buildAnnouncementHtml(title, content, adminName), true);
+            mailSender.send(message);
+            log.info("Announcement email sent to {}", toEmail);
+        } catch (MessagingException e) {
+            log.error("Failed to send announcement email to {}: {}", toEmail, e.getMessage());
+        }
+    }
+
+    private String buildAnnouncementHtml(String title, String content, String adminName) {
+        return """
+                <html><body style="font-family:Arial,sans-serif;color:#333;max-width:600px;margin:auto">
+                  <h2 style="color:#dc2626">&#x26A0; Urgent Announcement</h2>
+                  <h3>%s</h3>
+                  <p>%s</p>
+                  <hr style="border:1px solid #e5e7eb;margin:16px 0"/>
+                  <p style="color:#6b7280;font-size:12px">Posted by <strong>%s</strong> — Apartment Management</p>
+                </body></html>
+                """.formatted(title, content, adminName);
+    }
+
     private String buildReceiptHtml(String name, Long paymentId, BigDecimal amount,
                                     String billingMonth, String txnId, LocalDateTime paidAt) {
         String formatted = paidAt != null

@@ -25,7 +25,7 @@ public class CoreApiClient {
         headers.set("X-Service-Secret", serviceSecret);
         HttpEntity<Void> entity = new HttpEntity<>(headers);
         ResponseEntity<ApiResponse<List<ResidentInfo>>> response = restTemplate.exchange(
-                coreApiUrl + "/api/internal/residents",
+                coreApiUrl + "/api/users/internal/residents",
                 HttpMethod.GET,
                 entity,
                 new ParameterizedTypeReference<>() {}
