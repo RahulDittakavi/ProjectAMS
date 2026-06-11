@@ -1,8 +1,10 @@
 package com.apartmentapp.visitor;
 
+import com.apartmentapp.exception.ResourceNotFoundException;
 import com.apartmentapp.user.User;
 import com.apartmentapp.user.UserRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -10,6 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.List;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class VisitorService {
@@ -29,17 +32,21 @@ public class VisitorService {
                 .loggedBy(security)
                 .entryTime(LocalDateTime.now())
                 .build();
-        return mapToResponse(visitorRepository.save(visitor));
+        Visitor saved = visitorRepository.save(visitor);
+        log.info("Visitor entry logged: id={}, name={}, flat={}", saved.getId(), saved.getName(), saved.getFlatToVisit());
+        return mapToResponse(saved);
     }
 
     @Transactional
     public VisitorDTO.Response logExit(Long id) {
         Visitor visitor = visitorRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Visitor not found with id: " + id));
+                .orElseThrow(() -> new ResourceNotFoundException("Visitor not found with id: " + id));
         if (visitor.getExitTime() != null) {
+            log.warn("Duplicate exit attempt for visitorId={}", id);
             throw new RuntimeException("Exit time already recorded for this visitor");
         }
         visitor.setExitTime(LocalDateTime.now());
+        log.info("Visitor exit logged: id={}, name={}", id, visitor.getName());
         return mapToResponse(visitorRepository.save(visitor));
     }
 

@@ -1,14 +1,17 @@
 package com.apartmentapp.complaint;
 
+import com.apartmentapp.exception.ResourceNotFoundException;
 import com.apartmentapp.user.User;
 import com.apartmentapp.user.UserRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class ComplaintService {
@@ -26,7 +29,9 @@ public class ComplaintService {
                 .description(request.getDescription())
                 .category(request.getCategory())
                 .build();
-        return mapToResponse(complaintRepository.save(complaint));
+        Complaint saved = complaintRepository.save(complaint);
+        log.info("Complaint created: id={}, residentId={}, category={}", saved.getId(), resident.getId(), saved.getCategory());
+        return mapToResponse(saved);
     }
 
     public List<ComplaintDTO.Response> getMyComplaints(String email) {
@@ -44,9 +49,12 @@ public class ComplaintService {
     @Transactional
     public ComplaintDTO.Response updateStatus(Long id, ComplaintDTO.StatusUpdateRequest request) {
         Complaint complaint = complaintRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Complaint not found with id: " + id));
+                .orElseThrow(() -> new ResourceNotFoundException("Complaint not found with id: " + id));
+        ComplaintStatus previous = complaint.getStatus();
         complaint.setStatus(request.getStatus());
-        return mapToResponse(complaintRepository.save(complaint));
+        Complaint saved = complaintRepository.save(complaint);
+        log.info("Complaint status updated: id={}, {} -> {}", id, previous, saved.getStatus());
+        return mapToResponse(saved);
     }
 
     private ComplaintDTO.Response mapToResponse(Complaint c) {

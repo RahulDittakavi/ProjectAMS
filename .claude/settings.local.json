@@ -21,7 +21,8 @@
       "Bash(mkdir -p /c/ProjectAMS-main/payment-service/src/main/java/com/apartmentapp/security /c/ProjectAMS-main/payment-service/src/main/java/com/apartmentapp/billing /c/ProjectAMS-main/payment-service/src/main/java/com/apartmentapp/payment /c/ProjectAMS-main/payment-service/src/main/java/com/apartmentapp/config /c/ProjectAMS-main/payment-service/src/main/resources)",
       "Bash(psql -U postgres -c \"\\\\l\")",
       "PowerShell(& \"C:\\\\Program Files\\\\PostgreSQL\\\\17\\\\bin\\\\psql.exe\" -U postgres -c \"\\\\l\" 2>&1)",
-      "PowerShell(& \"C:\\\\Program Files\\\\PostgreSQL\\\\18\\\\bin\\\\psql.exe\" -U postgres -c \"\\\\l\" 2>&1)"
+      "PowerShell(& \"C:\\\\Program Files\\\\PostgreSQL\\\\18\\\\bin\\\\psql.exe\" -U postgres -c \"\\\\l\" 2>&1)",
+      "Bash(Get-ChildItem -Path \"C:\\\\ProjectAMS-main\" -Directory)"
     ],
     "additionalDirectories": [
       "C:\\ProjectAMS-main\\Backend\\src\\main\\java\\com\\apartmentapp"

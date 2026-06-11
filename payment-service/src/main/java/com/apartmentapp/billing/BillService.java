@@ -1,7 +1,9 @@
 package com.apartmentapp.billing;
 
 import com.apartmentapp.config.CoreApiClient;
+import com.apartmentapp.exception.ResourceNotFoundException;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -13,6 +15,7 @@ import java.time.YearMonth;
 import java.util.List;
 import java.util.Optional;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class BillService {
@@ -28,11 +31,14 @@ public class BillService {
                 .monthlyAmount(request.getMonthlyAmount())
                 .effectiveFrom(request.getEffectiveFrom())
                 .build();
-        return mapConfig(configRepository.save(config));
+        MaintenanceConfig saved = configRepository.save(config);
+        log.info("Maintenance config set: id={}, block={}, amount={}", saved.getId(), saved.getBlock(), saved.getMonthlyAmount());
+        return mapConfig(saved);
     }
 
     @Transactional
     public int generateBills(String month) {
+        log.info("Generating bills for month={}", month);
         YearMonth ym = YearMonth.parse(month);
         LocalDate dueDate = ym.atEndOfMonth().plusDays(15);
 
@@ -41,8 +47,10 @@ public class BillService {
         for (CoreApiClient.ResidentInfo resident : residents) {
             if (billRepository.existsByResidentIdAndBillingMonth(resident.getId(), month)) continue;
             Optional<BigDecimal> amount = resolveAmount(resident.getBlock());
-            if (amount.isEmpty()) continue;
-
+            if (amount.isEmpty()) {
+                log.warn("No maintenance config for block={}, skipping residentId={}", resident.getBlock(), resident.getId());
+                continue;
+            }
             billRepository.save(Bill.builder()
                     .residentId(resident.getId())
                     .residentName(resident.getName())
@@ -55,6 +63,7 @@ public class BillService {
                     .build());
             generated++;
         }
+        log.info("Bills generated for {}: count={}", month, generated);
         return generated;
     }
 
@@ -71,8 +80,9 @@ public class BillService {
 
     public BillDTO.BillResponse getReceipt(Long billId, Long residentId, boolean isAdmin) {
         Bill bill = billRepository.findById(billId)
-                .orElseThrow(() -> new RuntimeException("Bill not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Bill not found with id: " + billId));
         if (!isAdmin && !bill.getResidentId().equals(residentId)) {
+            log.warn("Unauthorized receipt access: billId={}, requestedBy={}", billId, residentId);
             throw new RuntimeException("Access denied");
         }
         return mapBill(bill);
@@ -81,10 +91,11 @@ public class BillService {
     @Transactional
     public void markBillPaid(Long billId, LocalDateTime paidAt) {
         Bill bill = billRepository.findById(billId)
-                .orElseThrow(() -> new RuntimeException("Bill not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Bill not found with id: " + billId));
         bill.setStatus(BillStatus.PAID);
         bill.setPaidAt(paidAt);
         billRepository.save(bill);
+        log.info("Bill marked paid: id={}, residentId={}, month={}", billId, bill.getResidentId(), bill.getBillingMonth());
     }
 
     public BillDTO.CollectionSummary getCollectionSummary(String month) {
@@ -108,12 +119,15 @@ public class BillService {
     @Scheduled(cron = "0 0 1 * * *")
     @Transactional
     public void markOverdueJob() {
+        log.info("Running scheduled overdue-mark job");
         billRepository.markOverdue(BillStatus.OVERDUE, BillStatus.UNPAID, LocalDate.now());
     }
 
     @Scheduled(cron = "0 0 1 1 * *")
     public void autoGenerateBillsJob() {
-        generateBills(YearMonth.now().toString());
+        String month = YearMonth.now().toString();
+        log.info("Running scheduled bill generation for {}", month);
+        generateBills(month);
     }
 
     private Optional<BigDecimal> resolveAmount(String block) {

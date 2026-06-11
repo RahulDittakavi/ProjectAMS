@@ -1,10 +1,12 @@
 package com.apartmentapp.user;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class UserService {
@@ -25,7 +27,9 @@ public class UserService {
         user.setPhone(request.getPhone());
         user.setFlatNumber(request.getFlatNumber());
         user.setBlock(request.getBlock());
-        return mapToResponse(userRepository.save(user));
+        User saved = userRepository.save(user);
+        log.info("Profile updated: id={}, email={}", saved.getId(), email);
+        return mapToResponse(saved);
     }
 
     public static UserDTO.Response mapToResponse(User user) {

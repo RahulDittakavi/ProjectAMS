@@ -1,8 +1,10 @@
 package com.apartmentapp.amenity;
 
+import com.apartmentapp.exception.ResourceNotFoundException;
 import com.apartmentapp.user.User;
 import com.apartmentapp.user.UserRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -10,6 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.util.List;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class AmenityService {
@@ -32,7 +35,9 @@ public class AmenityService {
                 .openTime(request.getOpenTime())
                 .closeTime(request.getCloseTime())
                 .build();
-        return mapAmenityToResponse(amenityRepository.save(amenity));
+        Amenity saved = amenityRepository.save(amenity);
+        log.info("Amenity created: id={}, name={}", saved.getId(), saved.getName());
+        return mapAmenityToResponse(saved);
     }
 
     @Transactional
@@ -41,7 +46,7 @@ public class AmenityService {
             throw new RuntimeException("End time must be after start time");
         }
         Amenity amenity = amenityRepository.findById(amenityId)
-                .orElseThrow(() -> new RuntimeException("Amenity not found with id: " + amenityId));
+                .orElseThrow(() -> new ResourceNotFoundException("Amenity not found with id: " + amenityId));
         if (!amenity.getIsActive()) {
             throw new RuntimeException("Amenity is not available for booking");
         }
@@ -52,6 +57,7 @@ public class AmenityService {
                 amenityId, request.getBookingDate(), request.getStartTime(), request.getEndTime(),
                 List.of(BookingStatus.REJECTED, BookingStatus.CANCELLED));
         if (!conflicts.isEmpty()) {
+            log.warn("Booking conflict: amenityId={}, date={}, resident={}", amenityId, request.getBookingDate(), email);
             throw new RuntimeException("The requested time slot conflicts with an existing booking");
         }
 
@@ -62,7 +68,9 @@ public class AmenityService {
                 .startTime(request.getStartTime())
                 .endTime(request.getEndTime())
                 .build();
-        return mapBookingToResponse(amenityBookingRepository.save(booking));
+        AmenityBooking saved = amenityBookingRepository.save(booking);
+        log.info("Amenity booked: bookingId={}, amenityId={}, residentId={}, date={}", saved.getId(), amenityId, resident.getId(), request.getBookingDate());
+        return mapBookingToResponse(saved);
     }
 
     public List<AmenityDTO.BookingResponse> getMyBookings(String email) {
@@ -81,14 +89,17 @@ public class AmenityService {
     public AmenityDTO.BookingResponse updateBookingStatus(Long bookingId,
                                                           AmenityDTO.BookingStatusUpdateRequest request) {
         AmenityBooking booking = amenityBookingRepository.findById(bookingId)
-                .orElseThrow(() -> new RuntimeException("Booking not found with id: " + bookingId));
+                .orElseThrow(() -> new ResourceNotFoundException("Booking not found with id: " + bookingId));
+        BookingStatus previous = booking.getStatus();
         booking.setStatus(request.getStatus());
-        return mapBookingToResponse(amenityBookingRepository.save(booking));
+        AmenityBooking saved = amenityBookingRepository.save(booking);
+        log.info("Booking status updated: id={}, {} -> {}", bookingId, previous, saved.getStatus());
+        return mapBookingToResponse(saved);
     }
 
     public AmenityDTO.AvailabilityResponse checkAvailability(Long amenityId, LocalDate date) {
         amenityRepository.findById(amenityId)
-                .orElseThrow(() -> new RuntimeException("Amenity not found with id: " + amenityId));
+                .orElseThrow(() -> new ResourceNotFoundException("Amenity not found with id: " + amenityId));
         List<AmenityBooking> bookings = amenityBookingRepository.findByAmenityIdAndBookingDate(amenityId, date);
         List<AmenityDTO.BookingResponse> responses = bookings.stream()
                 .map(this::mapBookingToResponse).toList();

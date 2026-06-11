@@ -4,6 +4,7 @@ import com.apartmentapp.billing.Bill;
 import com.apartmentapp.billing.BillRepository;
 import com.apartmentapp.billing.BillService;
 import com.apartmentapp.billing.BillStatus;
+import com.apartmentapp.exception.ResourceNotFoundException;
 import com.apartmentapp.kafka.PaymentCompletedEvent;
 import com.apartmentapp.kafka.PaymentEventProducer;
 import com.apartmentapp.security.JwtPrincipal;
@@ -11,6 +12,7 @@ import com.razorpay.Order;
 import com.razorpay.RazorpayClient;
 import com.razorpay.RazorpayException;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.json.JSONObject;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -24,6 +26,7 @@ import java.time.LocalDateTime;
 import java.util.HexFormat;
 import java.util.List;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class PaymentService {
@@ -46,8 +49,9 @@ public class PaymentService {
 
         if (request.getBillId() != null) {
             bill = billRepository.findById(request.getBillId())
-                    .orElseThrow(() -> new RuntimeException("Bill not found"));
+                    .orElseThrow(() -> new ResourceNotFoundException("Bill not found with id: " + request.getBillId()));
             if (!bill.getResidentId().equals(principal.getUserId())) {
+                log.warn("Unauthorized bill access: billId={}, requestedBy={}", request.getBillId(), principal.getUserId());
                 throw new RuntimeException("Bill does not belong to this resident");
             }
             if (bill.getStatus() == BillStatus.PAID) {
@@ -78,6 +82,7 @@ public class PaymentService {
                     .bill(bill)
                     .build();
             Payment saved = paymentRepository.save(payment);
+            log.info("Razorpay order created: paymentId={}, rzpOrderId={}, amount={}", saved.getId(), rzpOrderId, amount);
 
             return PaymentDTO.OrderResponse.builder()
                     .paymentId(saved.getId())
@@ -86,6 +91,7 @@ public class PaymentService {
                     .currency("INR")
                     .build();
         } catch (RazorpayException e) {
+            log.error("Razorpay order creation failed for residentId={}: {}", principal.getUserId(), e.getMessage());
             throw new RuntimeException("Failed to create Razorpay order: " + e.getMessage());
         }
     }
@@ -93,7 +99,7 @@ public class PaymentService {
     @Transactional
     public PaymentDTO.Response verifyPayment(PaymentDTO.VerifyPaymentRequest request) {
         Payment payment = paymentRepository.findByRazorpayOrderId(request.getRazorpayOrderId())
-                .orElseThrow(() -> new RuntimeException("Payment order not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Payment order not found: " + request.getRazorpayOrderId()));
         try {
             String payload = request.getRazorpayOrderId() + "|" + request.getRazorpayPaymentId();
             Mac mac = Mac.getInstance("HmacSHA256");
@@ -108,6 +114,8 @@ public class PaymentService {
                     billService.markBillPaid(payment.getBill().getId(), payment.getPaidAt());
                 }
                 Payment saved = paymentRepository.save(payment);
+                log.info("Payment verified successfully: paymentId={}, rzpPaymentId={}, amount={}",
+                        saved.getId(), saved.getRazorpayPaymentId(), saved.getAmount());
                 eventProducer.publishPaymentCompleted(PaymentCompletedEvent.builder()
                         .eventType("payment.completed")
                         .paymentId(saved.getId())
@@ -121,10 +129,12 @@ public class PaymentService {
                         .build());
                 return mapToResponse(saved);
             } else {
+                log.warn("Payment signature mismatch: paymentId={}, rzpOrderId={}", payment.getId(), request.getRazorpayOrderId());
                 payment.setStatus(PaymentStatus.FAILED);
             }
             return mapToResponse(paymentRepository.save(payment));
         } catch (Exception e) {
+            log.error("Payment verification error: paymentId={}, error={}", payment.getId(), e.getMessage());
             throw new RuntimeException("Payment verification failed: " + e.getMessage());
         }
     }
