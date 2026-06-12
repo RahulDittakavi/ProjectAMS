@@ -4,6 +4,8 @@ import com.apartmentapp.config.CoreApiClient;
 import com.apartmentapp.exception.ResourceNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,7 +26,11 @@ public class BillService {
     private final MaintenanceConfigRepository configRepository;
     private final CoreApiClient coreApiClient;
 
+    /**
+     * Set maintenance config and invalidate cache
+     */
     @Transactional
+    @CacheEvict(value = "maintenance_config", key = "'current'")
     public BillDTO.ConfigResponse setConfig(BillDTO.ConfigRequest request) {
         MaintenanceConfig config = MaintenanceConfig.builder()
                 .block(request.getBlock())
@@ -36,7 +42,11 @@ public class BillService {
         return mapConfig(saved);
     }
 
+    /**
+     * Generate bills and invalidate bill caches
+     */
     @Transactional
+    @CacheEvict(value = {"bills", "user_bills"}, allEntries = true)
     public int generateBills(String month) {
         log.info("Generating bills for month={}", month);
         YearMonth ym = YearMonth.parse(month);
@@ -67,17 +77,28 @@ public class BillService {
         return generated;
     }
 
+    /**
+     * Get bills for resident with caching (6 hour TTL)
+     */
+    @Cacheable(value = "user_bills", key = "#residentId")
     public List<BillDTO.BillResponse> getBillsByResident(Long residentId) {
         return billRepository.findByResidentIdOrderByBillingMonthDesc(residentId)
                 .stream().map(this::mapBill).toList();
     }
 
+    /**
+     * Get dues for resident (not cached - frequently changes)
+     */
     public List<BillDTO.BillResponse> getDuesByResident(Long residentId) {
         return billRepository.findByResidentIdAndStatusInOrderByBillingMonthDesc(
                         residentId, List.of(BillStatus.UNPAID, BillStatus.OVERDUE))
                 .stream().map(this::mapBill).toList();
     }
 
+    /**
+     * Get bill receipt with caching (6 hour TTL)
+     */
+    @Cacheable(value = "bills", key = "#billId")
     public BillDTO.BillResponse getReceipt(Long billId, Long residentId, boolean isAdmin) {
         Bill bill = billRepository.findById(billId)
                 .orElseThrow(() -> new ResourceNotFoundException("Bill not found with id: " + billId));
@@ -88,7 +109,11 @@ public class BillService {
         return mapBill(bill);
     }
 
+    /**
+     * Mark bill as paid and invalidate caches
+     */
     @Transactional
+    @CacheEvict(value = {"bills", "user_bills"}, allEntries = true)
     public void markBillPaid(Long billId, LocalDateTime paidAt) {
         Bill bill = billRepository.findById(billId)
                 .orElseThrow(() -> new ResourceNotFoundException("Bill not found with id: " + billId));
@@ -98,6 +123,9 @@ public class BillService {
         log.info("Bill marked paid: id={}, residentId={}, month={}", billId, bill.getResidentId(), bill.getBillingMonth());
     }
 
+    /**
+     * Get collection summary (not cached - admin-only, frequently requested)
+     */
     public BillDTO.CollectionSummary getCollectionSummary(String month) {
         List<Bill> allBills = billRepository.findByBillingMonthOrderByBlockAscFlatNumberAsc(month);
         long paidCount = billRepository.countByBillingMonthAndStatus(month, BillStatus.PAID);
@@ -116,6 +144,9 @@ public class BillService {
                 .build();
     }
 
+    /**
+     * Scheduled job to mark overdue bills
+     */
     @Scheduled(cron = "0 0 1 * * *")
     @Transactional
     public void markOverdueJob() {
@@ -123,7 +154,11 @@ public class BillService {
         billRepository.markOverdue(BillStatus.OVERDUE, BillStatus.UNPAID, LocalDate.now());
     }
 
+    /**
+     * Scheduled job to auto-generate bills (invalidates cache)
+     */
     @Scheduled(cron = "0 0 1 1 * *")
+    @CacheEvict(value = {"bills", "user_bills"}, allEntries = true)
     public void autoGenerateBillsJob() {
         String month = YearMonth.now().toString();
         log.info("Running scheduled bill generation for {}", month);

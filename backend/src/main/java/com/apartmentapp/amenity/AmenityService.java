@@ -5,6 +5,8 @@ import com.apartmentapp.user.User;
 import com.apartmentapp.user.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,12 +23,20 @@ public class AmenityService {
     private final AmenityBookingRepository amenityBookingRepository;
     private final UserRepository userRepository;
 
+    /**
+     * Get all active amenities with caching (4 hour TTL)
+     */
+    @Cacheable(value = "amenities", key = "'list'")
     public List<AmenityDTO.AmenityResponse> getAllAmenities() {
         return amenityRepository.findByIsActiveTrue().stream()
                 .map(this::mapAmenityToResponse).toList();
     }
 
+    /**
+     * Create amenity and invalidate list cache
+     */
     @Transactional
+    @CacheEvict(value = "amenities", key = "'list'")
     public AmenityDTO.AmenityResponse createAmenity(AmenityDTO.CreateAmenityRequest request) {
         Amenity amenity = Amenity.builder()
                 .name(request.getName())
@@ -40,6 +50,9 @@ public class AmenityService {
         return mapAmenityToResponse(saved);
     }
 
+    /**
+     * Book amenity and check availability
+     */
     @Transactional
     public AmenityDTO.BookingResponse bookAmenity(Long amenityId, String email, AmenityDTO.BookingRequest request) {
         if (!request.getEndTime().isAfter(request.getStartTime())) {
@@ -73,6 +86,9 @@ public class AmenityService {
         return mapBookingToResponse(saved);
     }
 
+    /**
+     * Get user's bookings
+     */
     public List<AmenityDTO.BookingResponse> getMyBookings(String email) {
         User resident = userRepository.findByEmail(email)
                 .orElseThrow(() -> new UsernameNotFoundException("User not found"));
@@ -80,12 +96,19 @@ public class AmenityService {
                 .stream().map(this::mapBookingToResponse).toList();
     }
 
+    /**
+     * Get all bookings
+     */
     public List<AmenityDTO.BookingResponse> getAllBookings() {
         return amenityBookingRepository.findAll().stream()
                 .map(this::mapBookingToResponse).toList();
     }
 
+    /**
+     * Update booking status and invalidate caches
+     */
     @Transactional
+    @CacheEvict(value = "amenity_slots", allEntries = true)
     public AmenityDTO.BookingResponse updateBookingStatus(Long bookingId,
                                                           AmenityDTO.BookingStatusUpdateRequest request) {
         AmenityBooking booking = amenityBookingRepository.findById(bookingId)
@@ -97,6 +120,10 @@ public class AmenityService {
         return mapBookingToResponse(saved);
     }
 
+    /**
+     * Check availability with caching (30 minute TTL)
+     */
+    @Cacheable(value = "amenity_slots", key = "#amenityId + ':' + #date")
     public AmenityDTO.AvailabilityResponse checkAvailability(Long amenityId, LocalDate date) {
         amenityRepository.findById(amenityId)
                 .orElseThrow(() -> new ResourceNotFoundException("Amenity not found with id: " + amenityId));

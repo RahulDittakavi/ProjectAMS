@@ -20,3 +20,35 @@ spring:
           uri: "${CORE_API_URL:http://localhost:8081}"
           predicates:
             - Path=/api/**
+  
+  # ============= Redis Configuration =============
+  redis:
+    host: localhost
+    port: 6379
+    password: redis_pass_123
+    timeout: 2000ms
+    database: 0
+    jedis:
+      pool:
+        max-active: 20
+        max-idle: 10
+        min-idle: 5
+        max-wait: -1ms
+  
+  # Cache Settings
+  cache:
+    type: redis
+    redis:
+      time-to-live: 3600000
+      cache-null-values: false
+  
+  # Session Configuration
+  session:
+    store-type: redis
+    timeout: 30m
+
+# Logging
+logging:
+  level:
+    org.springframework.cache: DEBUG
+    io.lettuce: DEBUG

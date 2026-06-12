@@ -32,6 +32,21 @@ services:
     ports:
       - "9092:9092"
 
+  redis:
+    image: redis:7.2-alpine
+    container_name: redis-cache
+    command: redis-server --appendonly yes --requirepass redis_pass_123
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
   # ─── Backend Services ───────────────────────────────────────────────────────
 
   core-api:
@@ -43,6 +58,9 @@ services:
       SPRING_DATASOURCE_USERNAME: postgres
       SPRING_DATASOURCE_PASSWORD: root
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      SPRING_REDIS_HOST: redis
+      SPRING_REDIS_PORT: 6379
+      SPRING_REDIS_PASSWORD: redis_pass_123
       JWT_SECRET: ${JWT_SECRET}
       INTERNAL_SERVICE_SECRET: ${INTERNAL_SERVICE_SECRET}
     ports:
@@ -52,6 +70,8 @@ services:
         condition: service_healthy
       kafka:
         condition: service_started
+      redis:
+        condition: service_healthy
     restart: on-failure
 
   payment-service:
@@ -63,6 +83,9 @@ services:
       SPRING_DATASOURCE_USERNAME: postgres
       SPRING_DATASOURCE_PASSWORD: root
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      SPRING_REDIS_HOST: redis
+      SPRING_REDIS_PORT: 6379
+      SPRING_REDIS_PASSWORD: redis_pass_123
       JWT_SECRET: ${JWT_SECRET}
       INTERNAL_SERVICE_SECRET: ${INTERNAL_SERVICE_SECRET}
       CORE_API_URL: http://core-api:8081
@@ -73,6 +96,8 @@ services:
         condition: service_healthy
       kafka:
         condition: service_started
+      redis:
+        condition: service_healthy
       core-api:
         condition: service_started
     restart: on-failure
@@ -83,11 +108,16 @@ services:
       dockerfile: Dockerfile
     environment:
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      SPRING_REDIS_HOST: redis
+      SPRING_REDIS_PORT: 6379
+      SPRING_REDIS_PASSWORD: redis_pass_123
     ports:
       - "8083:8083"
     depends_on:
       kafka:
         condition: service_started
+      redis:
+        condition: service_healthy
     restart: on-failure
 
   gateway:
@@ -119,3 +149,4 @@ services:
 
 volumes:
   postgres-data:
+  redis_data:
