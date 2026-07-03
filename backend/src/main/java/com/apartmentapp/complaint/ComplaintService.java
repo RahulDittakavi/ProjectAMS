@@ -46,6 +46,14 @@ public class ComplaintService {
                 .stream().map(this::mapToResponse).toList();
     }
 
+    public List<ComplaintDTO.Response> deleteComplaint(Long id) {
+        Complaint complaint = complaintRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Complaint not found with id: " + id));
+        complaintRepository.delete(complaint);
+        log.info("Complaint deleted: id={}", id);
+        return getAllComplaints();
+    }
+
     @Transactional
     public ComplaintDTO.Response updateStatus(Long id, ComplaintDTO.StatusUpdateRequest request) {
         Complaint complaint = complaintRepository.findById(id)

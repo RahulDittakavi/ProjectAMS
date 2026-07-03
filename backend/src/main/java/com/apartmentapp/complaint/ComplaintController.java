@@ -40,7 +40,7 @@ public class ComplaintController {
     public ResponseEntity<ApiResponse<List<ComplaintDTO.Response>>> getAllComplaints() {
         List<ComplaintDTO.Response> response = complaintService.getAllComplaints();
         return ResponseEntity.ok(ApiResponse.success("All complaints fetched", response));
-    }
+    }       
 
     @PutMapping("/{id}/status")
     @PreAuthorize("hasRole('ADMIN')")
@@ -49,5 +49,12 @@ public class ComplaintController {
             @Valid @RequestBody ComplaintDTO.StatusUpdateRequest request) {
         ComplaintDTO.Response response = complaintService.updateStatus(id, request);
         return ResponseEntity.ok(ApiResponse.success("Status updated successfully", response));
+    }
+
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('RESIDENT') or hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<List<ComplaintDTO.Response>>> deleteComplaint(@PathVariable Long id) {
+        List<ComplaintDTO.Response> response = complaintService.deleteComplaint(id);
+        return ResponseEntity.ok(ApiResponse.success("Complaint deleted successfully", response));
     }
 }

@@ -36,7 +36,7 @@ public class CacheConfig {
         configs.put("maintenance_config",
             buildCacheConfig(Duration.ofHours(24)));
 
-        return RedisCacheManager.builder(RedisCacheWriter.create(connectionFactory))
+        return RedisCacheManager.builder(RedisCacheWriter.nonLockingRedisCacheWriter(connectionFactory))
             .cacheDefaults(buildCacheConfig(Duration.ofHours(1)))
             .withInitialCacheConfigurations(configs)
             .build();

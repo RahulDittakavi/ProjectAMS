@@ -108,16 +108,11 @@ services:
       dockerfile: Dockerfile
     environment:
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
-      SPRING_REDIS_HOST: redis
-      SPRING_REDIS_PORT: 6379
-      SPRING_REDIS_PASSWORD: redis_pass_123
     ports:
       - "8083:8083"
     depends_on:
       kafka:
         condition: service_started
-      redis:
-        condition: service_healthy
     restart: on-failure
 
   gateway:
@@ -128,11 +123,18 @@ services:
       CORE_API_URL: http://core-api:8081
       PAYMENT_SERVICE_URL: http://payment-service:8082
       ALLOWED_ORIGIN: http://localhost:4200
+      SPRING_REDIS_HOST: redis
+      SPRING_REDIS_PORT: 6379
+      SPRING_REDIS_PASSWORD: redis_pass_123
     ports:
       - "8080:8080"
     depends_on:
-      - core-api
-      - payment-service
+      redis:
+        condition: service_healthy
+      core-api:
+        condition: service_started
+      payment-service:
+        condition: service_started
 
   # ─── Frontend ───────────────────────────────────────────────────────────────
 

@@ -22,7 +22,25 @@
       "Bash(psql -U postgres -c \"\\\\l\")",
       "PowerShell(& \"C:\\\\Program Files\\\\PostgreSQL\\\\17\\\\bin\\\\psql.exe\" -U postgres -c \"\\\\l\" 2>&1)",
       "PowerShell(& \"C:\\\\Program Files\\\\PostgreSQL\\\\18\\\\bin\\\\psql.exe\" -U postgres -c \"\\\\l\" 2>&1)",
-      "Bash(Get-ChildItem -Path \"C:\\\\ProjectAMS-main\" -Directory)"
+      "Bash(Get-ChildItem -Path \"C:\\\\ProjectAMS-main\" -Directory)",
+      "Bash(Get-ChildItem -Path \"c:\\\\ProjectAMS-main\" -Recurse -Directory -ErrorAction SilentlyContinue)",
+      "Bash(Select-Object -First 20)",
+      "Bash(del \"c:\\\\ProjectAMS-main\\\\notification-service\\\\src\\\\main\\\\java\\\\com\\\\apartmentapp\\\\notification\\\\config\\\\RedisConfig.java\")",
+      "Bash(java -version)",
+      "Bash(mvn -version)",
+      "Bash(npm --version)",
+      "Bash(\"/mnt/c/Program Files/Java/jdk-19/bin/java.exe\" -version)",
+      "Bash(cmd.exe /c \"where mvn\")",
+      "Bash(cmd.exe /c \"echo %JAVA_HOME%\")",
+      "Bash(cmd.exe /c \"java -version\")",
+      "Bash(cmd.exe /c \"cd C:\\\\ProjectAMS-main\\\\backend && mvn.cmd -q -DskipTests compile\")",
+      "Bash(cmd.exe *)",
+      "Bash(echo \"exit:$?\")",
+      "Bash(npm.cmd run *)",
+      "Bash(python3 -c ' *)",
+      "Bash(python3 *)",
+      "Bash(docker compose *)",
+      "Bash(git check-ignore *)"
     ],
     "additionalDirectories": [
       "C:\\ProjectAMS-main\\Backend\\src\\main\\java\\com\\apartmentapp"
